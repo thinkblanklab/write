@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>따라쓰기 워크시트 생성기 (MVP)</title>
+         <link href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&display=swap" rel="stylesheet">
+
+  <style>
+    :root { --border:#e5e7eb; --bg:#fafafa; --text:#111827; }
+    body {
+      margin:0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", Arial, sans-serif;
+      color:var(--text);
+      background:var(--bg);
+    }
+    .wrap {
+      max-width: 1100px; margin: 20px auto; padding: 16px;
+      display:grid; gap:16px; grid-template-columns: 360px 1fr;
+    }
+    .card {
+      background:#fff; border:1px solid var(--border);
+      border-radius:14px; padding:14px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.06);
+    }
+    h1 { font-size:18px; margin:0 0 10px; }
+    label { display:block; font-size:12px; margin:12px 0 6px; color:#374151; }
+
+    textarea, select, input[type="number"] {
+      width:100%; box-sizing:border-box;
+      border:1px solid var(--border); border-radius:10px; padding:10px;
+      font-size:14px; background:#fff;
+    }
+    textarea { min-height: 84px; resize: vertical; line-height: 1.6;  /* ✨ 이 줄을 추가하세요 (줄 간격을 1.6배로 넓힘) */}
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+
+    .btns {
+      display: flex;
+      gap: 12px;
+      margin-top: 14px;
+      flex-wrap: nowrap;
+      justify-content: flex-start; /* center 로 바꾸면 중앙정렬 */
+    }
+
+/* [스타일 추가] 프리셋 칩 버튼 */
+    .preset-btns { display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+    .chip {
+      background: #f3f4f6; border: 1px solid #d1d5db; color: #4b5563;
+      padding: 6px 12px; border-radius: 99px; font-size: 12px; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .chip:hover { background: #e5e7eb; color: #111827; }
+.chip.active {
+  background: #111827;
+  color: #ffffff;
+  border-color: #111827;
+}
+    button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 16px;
+      min-height: 40px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.2px;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+
+    button.primary {
+      background: #111827;
+      color: #ffffff;
+      border: none;
+      box-shadow: 0 4px 12px rgba(17, 24, 39, 0.25);
+    }
+    button.primary:hover { background: #0f172a; transform: translateY(-1px); }
+
+    button.secondary {
+      background: #ffffff;
+      color: #111827;
+      border: 1px solid #e5e7eb;
+    }
+    button.secondary:hover { background: #f9fafb; }
+
+    .hint-small { margin-top: 6px; font-size: 12px; color: #6b7280; }
+
+    .hint { font-size:12px; color:#6b7280; line-height:1.45; margin-top:8px; }
+    .small { font-size:11px; color:#6b7280; margin-top:6px; }
+    .canvasWrap { display:flex; justify-content:center; align-items:flex-start; padding:10px; }
+    canvas { width:100%; max-width: 680px; height:auto; border-radius:14px; border:1px solid var(--border); background:#fff; }
+    .badge { display:inline-block; font-size:11px; padding:4px 8px; border-radius:999px; background:#eef2ff; color:#3730a3; border:1px solid #c7d2fe; margin-left:6px; }
+  
+  @media (max-width: 768px) {
+  .wrap { grid-template-columns: 1fr; }
+  .canvasWrap canvas { width: 100%; }
+}
+  
+/* 우리 아이 문장 저장 박스 스타일 */
+.kidBox { margin-top:10px; padding:12px; border:1px solid #e5e7eb; border-radius:12px; background:#fafafa; }
+.kidBoxTitle { font-size:12px; font-weight:700; color:#374151; margin-bottom:8px; }
+.kidBoxBtns { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
+  
+/* 토스트 메시지 (잠깐 떴다 사라지는 알림) */
+.toast-msg {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(17, 24, 39, 0.9); /* 진한 남색 반투명 */
+  color: #fff;
+  padding: 10px 24px;
+  border-radius: 99px;
+  font-size: 14px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  z-index: 9999;
+  animation: fadeUp 0.3s ease-out;
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translate(-50%, 20px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>따라쓰기 워크시트 생성기 <span class="badge">MVP</span></h1>
+
+      <label>문구 입력 (여러 줄 가능)</label>
+      <div class="preset-btns">
+        <button class="chip" onclick="setPreset('funny')">💩 웃음 폭탄</button>
+        <button class="chip" onclick="setPreset('food')">🍡 맛있는 거</button>
+        <button class="chip" onclick="setPreset('wish')">🙏 현실 소원</button>
+        <button class="chip" onclick="setPreset('youtube')">🎬 나도 유튜버</button>
+        <button class="chip" data-preset="kpop" onclick="setPreset('kpop')">🎤 아이돌 데뷔</button>
+        <button class="chip" data-preset="power" onclick="setPreset('power')">💪 자존감 쑥쑥</button>
+      </div>
+      <div class="hint-text" style="font-size:12px; color:#6b7280; margin-bottom:4px;">
+        👇 직접 쓰거나, 위 버튼을 눌러보세요!
+      </div> <textarea id="text" placeholder="Tip: 아이 이름, 포켓몬 이름, 좋아하는 노래 가사를 적어주세요."></textarea>
+<div class="kidBox">
+  <div class="kidBoxTitle">⭐ 우리 아이 문장 (나만의 저장소)</div>
+  <div class="kidBoxBtns">
+    <button class="chip" id="kidSaveBtn" onclick="saveKidPreset()">현재 입력 저장</button>
+    <button class="chip" id="kidLoadBtn" onclick="loadKidPreset()">저장문장 불러오기</button>
+  </div>
+  <div class="hint-small">지금 쓰는 기기(브라우저)에만 저장돼요!</div>
+</div>
+
+
+      <label>글씨체 선택</label>
+      <select id="font">
+        <option value='"Malgun Gothic","맑은 고딕","Noto Sans KR",sans-serif'>고딕체(기본)</option>
+        <option value='"Batang","바탕",serif'>명조체(바탕)</option>
+        <option value='"Gungsuh","궁서",serif'>궁서체</option>
+        <option value='"Nanum Pen Script", cursive'>나눔 손글씨 펜</option>
+      </select>
+
+      <div class="row">
+        <div>
+          <label>글자 크기</label>
+          <input id="fontSize" type="number" min="24" max="120" step="1" value="64" />
+        </div>
+        <div>
+          <label>줄 수</label>
+          <input id="lines" type="number" min="3" max="20" step="1" value="10" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>따라쓰기 스타일</label>
+          <select id="traceStyle">
+            <option value="solid">연한 실선(추천)</option>
+            <option value="dashed">회색 점선(고급)</option>
+          </select>
+          <label>실선 진하기 (프린트용)</label>
+<input
+  id="alpha"
+  type="range"
+  min="0.15"
+  max="0.80"
+  step="0.05"
+  value="0.35"
+/>
+<div class="hint-small">연하게 ↔ 진하게 (프린터마다 조절하세요)</div>
+
+        </div>
+        <div>
+          <label>배경 선택</label>
+          <select id="bg">
+            <option value="kakdugi">한글 깍두기</option>
+            <option value="fourline">영어 4선</option>
+            <option value="blank">민자</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>상단 제목</label>
+          <select id="titleMode">
+            <option value="none">없음</option>
+            <option value="date">오늘 날짜 넣기</option>
+            <option value="name">이름 칸 표시</option>
+            <option value="date+name">날짜 + 이름</option>
+          </select>
+        </div>
+        <div>
+          <label>여백(프린트 안전영역)</label>
+          <input id="margin" type="number" min="24" max="120" step="1" value="64" />
+        </div>
+      </div>
+
+      <div class="btns">
+        <button id="pdf" class="primary">PDF 인쇄 ⭐</button>
+        <button id="download" class="secondary">PNG 저장</button>
+      </div>
+      <p class="hint-small">PDF는 A4 인쇄용으로 가장 깔끔해요</p>
+
+      <div class="hint">
+        - 입력/옵션을 바꾸면 자동으로 오른쪽 미리보기가 갱신됩니다.<br/>
+        - 출력은 PDF 인쇄(CTRL+P → PDF로 저장) 또는 PNG 저장 후 인쇄.<br/>
+        - 점선은 “윤곽 점선” 느낌(가장 교재에 가까운 방식)으로 구현됩니다.
+      </div>
+      <div class="small">Tip: 아이가 좋아하는 단어/이름/가사 한 줄만 넣어도 효과 좋아요.</div>
+    </div>
+
+    <div class="card">
+      <div class="canvasWrap">
+        <!-- A4 비율: 2480 x 3508 (300dpi) 대신, 가볍게 1240 x 1754(150dpi) -->
+        <canvas id="paper" width="1240" height="1754"></canvas>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const canvas = document.getElementById("paper");
+  const ctx = canvas.getContext("2d");
+
+  const els = {
+    pdf: document.getElementById("pdf"),
+    download: document.getElementById("download"),
+    text: document.getElementById("text"),
+    font: document.getElementById("font"),
+    fontSize: document.getElementById("fontSize"),
+    lines: document.getElementById("lines"),
+    traceStyle: document.getElementById("traceStyle"),
+    bg: document.getElementById("bg"),
+    titleMode: document.getElementById("titleMode"),
+    margin: document.getElementById("margin"),
+    alpha: document.getElementById("alpha"),
+  };
+
+  /* 1. 프리셋 데이터 (재미있는 문구들) */
+ /* 1. 프리셋 데이터 (재미있는 문구들) */
+  const presets = {
+    funny: "방귀 소리가 뽕 하고 났다\n내 발 냄새는 치즈 냄새\n코딱지는 먹으면 짭짤해\n세상에서 제일 웃긴 춤\n개구리 뒷다리 쑥",
+    food: "마라탕에 분모자 추가요\n겉바속촉 양념 치킨\n탕후루는 설탕이 바사삭\n편의점 컵라면이 최고야\n시원한 아이스크림 주세요",
+    wish: "오늘 숙제는 없는 걸로 해요\n용돈 올려주세요 엄마\n게임 30분만 더 할래요\n학원 안 가고 놀고 싶다\n나는 아무 생각이 없다",
+    // ▼▼▼ 요기 아래 줄 끝에 콤마(,)가 꼭 있어야 해요! ▼▼▼
+    youtube: "구독과 좋아요 눌러주세요\n알림 설정까지 딸랑딸랑\n안녕하세요 여러분 TV입니다\n오늘은 먹방을 찍어볼게요\n재밌었다면 댓글 달아줘",
+    kpop: "무대 위 주인공은 바로 나\n반짝반짝 빛나는 조명\n팬들의 함성 소리가 들려\n멋진 춤을 보여줄게요\n꿈을 향해 달려가자",
+    power: "나는 세상에서 가장 소중해\n실수해도 괜찮아 다시 해봐\n매일매일 더 멋져질 거야\n나는 나를 사랑해요\n할 수 있다고 믿어봐"
+  };
+
+/* [추가 기능] 우리 아이 문장 저장/불러오기 (토스트 메시지 적용) */
+  const KID_KEY = "kid_preset_text_v1";
+
+  // 토스트 메시지 띄우기 함수 (2초 뒤 사라짐)
+  function showToast(message) {
+    const div = document.createElement("div");
+    div.className = "toast-msg";
+    div.innerText = message;
+    document.body.appendChild(div);
+    
+    // 2초 후에 서서히 사라지게 하기
+    setTimeout(() => {
+      div.style.transition = "opacity 0.5s";
+      div.style.opacity = "0";
+      setTimeout(() => div.remove(), 500); // 완전히 삭제
+    }, 2000);
+  }
+
+  // 저장하기 기능
+  window.saveKidPreset = () => {
+    const v = (els.text.value || "").trim();
+    if(!v){
+      showToast("먼저 내용을 입력해주세요! 😅"); // 경고도 부드럽게
+      return;
+    }
+    localStorage.setItem(KID_KEY, v);
+    showToast("⭐ 저장 완료! (브라우저에 저장됨)"); // 성공 알림
+  };
+
+  // 불러오기 기능
+  window.loadKidPreset = () => {
+    const saved = localStorage.getItem(KID_KEY);
+    if(!saved || !saved.trim()){
+      showToast("아직 저장된 문장이 없어요 🥲");
+      return;
+    }
+    els.text.value = saved;
+    render(); 
+    showToast("📂 저장했던 문장을 불러왔어요!");
+  };
+
+  /* 2. 버튼 클릭 기능 (색상 변경 + 텍스트 입력) */
+  window.setPreset = (type) => {
+    // 텍스트 변경
+    els.text.value = presets[type];
+    
+    // 버튼 색상 활성화 (active 클래스)
+    document.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
+    // 클릭된 버튼에만 색칠하기 (event가 있을 때만 실행)
+    if(window.event) window.event.target.classList.add("active");
+
+    render(); // 화면 갱신
+  };
+
+  function todayKR() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const da = String(d.getDate()).padStart(2, "0");
+    return `${y}.${m}.${da}`;
+  }
+
+  function clearPaper() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  function drawHeader(margin) {
+    const mode = els.titleMode.value;
+    if (mode === "none") return 0;
+
+    const headerH = 90;
+    ctx.save();
+    ctx.strokeStyle = "#e5e7eb";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(margin, margin, canvas.width - margin * 2, headerH);
+
+    ctx.fillStyle = "#111827";
+    ctx.font = `600 28px ${els.font.value}`;
+    ctx.textBaseline = "middle";
+
+    let leftText = "";
+    let rightText = "";
+
+    if (mode.includes("date")) leftText = `날짜: ${todayKR()}`;
+    if (mode.includes("name")) rightText = "이름: ____________________";
+
+    if (leftText) ctx.fillText(leftText, margin + 18, margin + headerH / 2);
+    if (rightText) {
+      const w = ctx.measureText(rightText).width;
+      ctx.fillText(rightText, canvas.width - margin - 18 - w, margin + headerH / 2);
+    }
+
+    ctx.restore();
+    return headerH + 26;
+  }
+
+  function drawBackground(type, margin, topOffset, lineGap) {
+    ctx.save();
+    ctx.strokeStyle = "#e5e7eb";
+    ctx.lineWidth = 2;
+
+    const left = margin;
+    const right = canvas.width - margin;
+    const top = margin + topOffset;
+    const bottom = canvas.height - margin;
+
+    // 바깥 테두리
+    ctx.strokeRect(left, top, right - left, bottom - top);
+
+    if (type === "blank") {
+      ctx.strokeStyle = "#f1f5f9";
+      for (let i = 0; i < Number(els.lines.value); i++) {
+        const y = top + (i + 1) * lineGap;
+        ctx.beginPath();
+        ctx.moveTo(left, y);
+        ctx.lineTo(right, y);
+        ctx.stroke();
+      }
+      ctx.restore();
+      return;
+    }
+
+    if (type === "kakdugi") {
+      const cell = Math.max(52, Math.floor(lineGap * 0.9));
+      ctx.strokeStyle = "#eef2f7";
+      ctx.lineWidth = 2;
+
+      for (let i = 0; i < Number(els.lines.value); i++) {
+        const rowTop = top + i * lineGap;
+        const rowMid = rowTop + lineGap * 0.5;
+
+        // 줄 기준선
+        ctx.beginPath();
+        ctx.moveTo(left, rowTop + lineGap);
+        ctx.lineTo(right, rowTop + lineGap);
+        ctx.stroke();
+
+        // 깍두기 박스들
+        let x = left + 18;
+        while (x + cell <= right - 18) {
+          const y = rowMid - cell / 2;
+          ctx.strokeRect(x, y, cell, cell);
+          x += cell + 14;
+        }
+      }
+      ctx.restore();
+      return;
+    }
+
+    if (type === "fourline") {
+      for (let i = 0; i < Number(els.lines.value); i++) {
+        const capY  = top + i * lineGap + lineGap * 0.28;
+        const midY  = top + i * lineGap + lineGap * 0.53;
+        const baseY = top + i * lineGap + lineGap * 0.78;
+        const lowY  = top + i * lineGap + lineGap * 0.90;
+
+        ctx.save();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "#e5e7eb";
+        [capY, midY, lowY].forEach(y => {
+          ctx.beginPath();
+          ctx.moveTo(left + 18, y);
+          ctx.lineTo(right - 18, y);
+          ctx.stroke();
+        });
+
+        ctx.strokeStyle = "#cbd5e1";
+        ctx.beginPath();
+        ctx.moveTo(left + 18, baseY);
+        ctx.lineTo(right - 18, baseY);
+        ctx.stroke();
+        ctx.restore();
+      }
+      ctx.restore();
+      return;
+    }
+
+    ctx.restore();
+  }
+
+  function wrapLines(inputText) {
+    const raw = inputText.split("\n").map(s => s.trim()).filter(Boolean);
+    return raw.length ? raw : [" "];
+  }
+
+  function drawTracingText(margin, topOffset, lineGap) {
+    const linesCount = Number(els.lines.value);
+    const baseSize = Number(els.fontSize.value);
+    const fontFamily = els.font.value;
+    const style = els.traceStyle.value;
+
+    const phrases = wrapLines(els.text.value);
+
+    const left = margin + 36;
+    const right = canvas.width - margin - 36;
+
+    ctx.save();
+    ctx.textBaseline = "alphabetic";
+
+    for (let i = 0; i < linesCount; i++) {
+      const phrase = phrases[i % phrases.length];
+
+      // 각 줄의 기준 y
+      let y = margin + topOffset + (i + 1) * lineGap - lineGap * 0.22;
+      if (els.bg.value === "fourline") {
+        y = margin + topOffset + i * lineGap + lineGap * 0.78;
+      }
+
+      ctx.font = `${Math.floor(baseSize)}px ${fontFamily}`;
+      const w = ctx.measureText(phrase).width;
+      const maxW = right - left;
+      const scale = w > maxW ? (maxW / w) : 1;
+
+      const size = Math.max(14, Math.floor(baseSize * scale));
+      const fontStr = `${size}px ${fontFamily}`;
+
+      ctx.save();
+      ctx.font = fontStr;
+
+      if (style === "dashed") {
+        ctx.setLineDash([Math.max(6, size / 10), Math.max(6, size / 10)]);
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.strokeStyle = "#9ca3af";
+        ctx.lineWidth = Math.max(2, Math.floor(size / 22));
+        ctx.strokeText(phrase, left, y);
+      } else {
+        ctx.setLineDash([]);
+        ctx.fillStyle = "#9ca3af";
+        const alpha = Number(els.alpha?.value || 0.35);
+        ctx.globalAlpha = alpha;
+        ctx.fillText(phrase, left, y);
+
+        ctx.globalAlpha = 0.25;
+        ctx.strokeStyle = "#9ca3af";
+        ctx.lineWidth = Math.max(1, Math.floor(size / 40));
+        ctx.strokeText(phrase, left, y);
+      }
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  function render() {
+    const margin = Number(els.margin.value);
+    const linesCount = Number(els.lines.value);
+    clearPaper();
+    const headerOffset = drawHeader(margin);
+    const topOffset = headerOffset + 18;
+    const usableH = canvas.height - (margin + topOffset) - margin;
+    const lineGap = Math.floor(usableH / linesCount);
+    drawBackground(els.bg.value, margin, topOffset, lineGap);
+    drawTracingText(margin, topOffset, lineGap);
+  }
+
+  function downloadPNG() {
+    const name = `worksheet_${todayKR().replaceAll(".","-")}.png`;
+    const link = document.createElement("a");
+    link.download = name;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  }
+
+  function saveAsPDF() {
+    const win = window.open("", "_blank");
+    win.document.write(`
+      <html>
+      <head>
+        <title>따라쓰기 워크시트 PDF</title>
+        <style>
+          @page { size: A4; margin: 0; }
+          body { margin: 0; display:flex; justify-content:center; align-items:center; }
+          img { width: 210mm; height: 297mm; }
+        </style>
+      </head>
+      <body>
+        <img src="${canvas.toDataURL("image/png")}" />
+      </body>
+      </html>
+    `);
+    win.document.close();
+    win.onload = () => { win.focus(); win.print(); };
+  }
+
+  // 이벤트
+  els.download.addEventListener("click", downloadPNG);
+  els.pdf.addEventListener("click", saveAsPDF);
+
+  ["text","font","fontSize","lines","traceStyle","bg","titleMode","margin", "alpha"].forEach(id => {
+    els[id].addEventListener("input", render);
+    els[id].addEventListener("change", render);
+  });
+
+// [수정됨] 폰트 변경 감지 및 '안전하게' 다시 그리기
+  els.font.addEventListener("change", () => {
+    // 1. 일단 반응을 보여주기 위해 바로 그립니다.
+    render();
+
+    // 2. 브라우저에게 "이 폰트 준비 다 됐니?" 확인합니다.
+    const fontStr = "60px " + els.font.value;
+    
+    document.fonts.load(fontStr).then(() => {
+        // 3. 로딩이 끝났다는 신호가 오면 다시 그립니다.
+        render();
+        
+        // [추가된 안전장치] 
+        // 사람 눈보다 아주 조금 늦게(0.05초 뒤) 한 번 더 확실하게 덧그립니다.
+        // (반반 섞이는 '깜빡임' 현상을 덮어줍니다)
+        setTimeout(render, 50);
+    });
+  });
+
+  /* 3. 초기 실행 (화면 켜지자마자 실행되는 곳) */
+  // 기본값 문구는 여기서 딱 한 번만 설정!
+  els.text.value = "사랑하는 우리 아들,딸\n매일매일 응원해\n오늘 저녁은 치킨이다\n신나게 놀자";
+ // ⭐ 핵심 수정: 폰트가 다 로딩될 때까지 기다렸다가 그리기
+  document.fonts.ready.then(() => {
+    render();
+  });
+})();
+</script>
+</body>
+</html>

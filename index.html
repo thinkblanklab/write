@@ -132,12 +132,12 @@
 
       <label>문구 입력 (여러 줄 가능)</label>
       <div class="preset-btns">
-        <button class="chip" onclick="setPreset('funny')">💩 웃음 폭탄</button>
-        <button class="chip" onclick="setPreset('food')">🍡 맛있는 거</button>
-        <button class="chip" onclick="setPreset('wish')">🙏 현실 소원</button>
-        <button class="chip" onclick="setPreset('youtube')">🎬 나도 유튜버</button>
-        <button class="chip" data-preset="kpop" onclick="setPreset('kpop')">🎤 아이돌 데뷔</button>
-        <button class="chip" data-preset="power" onclick="setPreset('power')">💪 자존감 쑥쑥</button>
+        <button class="chip" data-preset="funny" onclick="setPreset('funny', event)">💩 웃음 폭탄</button>
+        <button class="chip" data-preset="food" onclick="setPreset('food', event)">🍡 맛있는 거</button>
+        <button class="chip" data-preset="wish" onclick="setPreset('wish', event)">🙏 현실 소원</button>
+        <button class="chip" data-preset="youtube" onclick="setPreset('youtube', event)">🎬 나도 유튜버</button>
+        <button class="chip" data-preset="kpop" onclick="setPreset('kpop', event)">🎤 아이돌 데뷔</button>
+        <button class="chip" data-preset="power" onclick="setPreset('power', event)">💪 자존감 쑥쑥</button>
       </div>
       <div class="hint-text" style="font-size:12px; color:#6b7280; margin-bottom:4px;">
         👇 직접 쓰거나, 위 버튼을 눌러보세요!
@@ -311,14 +311,20 @@
   };
 
   /* 2. 버튼 클릭 기능 (색상 변경 + 텍스트 입력) */
-  window.setPreset = (type) => {
+ /* 2. 버튼 클릭 기능 (안정성 강화 버전) */
+  window.setPreset = (type, e) => {
     // 텍스트 변경
     els.text.value = presets[type];
     
-    // 버튼 색상 활성화 (active 클래스)
-    document.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
-    // 클릭된 버튼에만 색칠하기 (event가 있을 때만 실행)
-    if(window.event) window.event.target.classList.add("active");
+    // [수정됨] 범위 한정: 모든 .chip이 아니라 '프리셋 버튼들' 안의 .chip만 active 제거
+    // 이렇게 해야 밑에 있는 '저장/불러오기' 버튼이 영향을 안 받습니다.
+    document.querySelectorAll(".preset-btns .chip").forEach(c => c.classList.remove("active"));
+    
+    // [수정됨] 클릭된 녀석(e.currentTarget)에게 active 추가
+    // window.event보다 훨씬 안정적이고 정확합니다.
+    if(e && e.currentTarget) {
+      e.currentTarget.classList.add("active");
+    }
 
     render(); // 화면 갱신
   };
@@ -594,4 +600,5 @@
 </script>
 </body>
 </html>
+
 
